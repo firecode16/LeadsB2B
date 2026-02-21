@@ -238,7 +238,6 @@ MIT License — uso libre, bajo tu propia responsabilidad.
 ---
 
 ¿Preguntas o mejoras? Abre un issue o contacta al mantenedor.
-```
 
 ### ✅ Cambios principales respecto a versiones anteriores
 
@@ -248,5 +247,3 @@ MIT License — uso libre, bajo tu propia responsabilidad.
 4. **Notas de seguridad** reforzadas sobre la cuenta de WhatsApp y el perfil persistente.
 5. **Comandos de exportación** actualizados con las opciones `--todos`, `--nicho`, `--expo`.
 6. **Estructura de archivos** actualizada reflejando los scripts actuales.
-
-Puedes copiar este contenido directamente y pegarlo en el editor de GitHub (el enlace que compartiste). Asegúrate de que el formato Markdown se vea bien (puedes previsualizarlo antes de guardar).
