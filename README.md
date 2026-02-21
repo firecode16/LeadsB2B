@@ -238,12 +238,3 @@ MIT License — uso libre, bajo tu propia responsabilidad.
 ---
 
 ¿Preguntas o mejoras? Abre un issue o contacta al mantenedor.
-
-### ✅ Cambios principales respecto a versiones anteriores
-
-1. **Sección de instalación detallada** con comandos para Windows y Linux.
-2. **Variables de entorno** claramente documentadas (incluyendo las nuevas `SCRIPTS_DIR` y `EXPORTS_DIR` para n8n).
-3. **Integración con n8n** explicada paso a paso (importación, configuración de credenciales, webhook).
-4. **Notas de seguridad** reforzadas sobre la cuenta de WhatsApp y el perfil persistente.
-5. **Comandos de exportación** actualizados con las opciones `--todos`, `--nicho`, `--expo`.
-6. **Estructura de archivos** actualizada reflejando los scripts actuales.
