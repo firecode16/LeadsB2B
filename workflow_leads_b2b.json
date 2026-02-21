@@ -1,0 +1,324 @@
+{
+  "name": "Leads B2B — Salud Mental CDMX",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-manual",
+      "name": "▶️ Inicio Manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 400]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [1],
+              "triggerAtHour": 6,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "trigger-schedule",
+      "name": "⏰ Schedule Semanal (Lunes 6am)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 560]
+    },
+    {
+      "parameters": {
+        "command": "cd /home/user/scripts && python3 extractor_leads.py --keyword \"psicólogo CDMX\" --location \"Ciudad de México\" --max 200 --output leads_raw.json 2>&1"
+      },
+      "id": "script1-extractor",
+      "name": "📜 Script 1 — Extractor de Leads",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [520, 480],
+      "notesInFlow": true,
+      "notes": "Extrae leads desde Apollo + Google Maps.\nGenera: leads_raw.json"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-exit-code",
+              "leftValue": "={{ $json.exitCode }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-script1",
+      "name": "✅ ¿Script 1 OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [760, 480]
+    },
+    {
+      "parameters": {
+        "command": "cd /home/user/scripts && python3 verificar_whatsapp.py --input leads_raw.json --output leads_verificados.json --max-hora 40 2>&1"
+      },
+      "id": "script2-verificador",
+      "name": "📜 Script 2 — Verificador WhatsApp",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1020, 400],
+      "notesInFlow": true,
+      "notes": "Verifica números en WhatsApp Web.\nGenera: leads_verificados.json\n⚠️ Puede tardar horas con 200+ leads."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-exit-code-2",
+              "leftValue": "={{ $json.exitCode }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-script2",
+      "name": "✅ ¿Script 2 OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1260, 400]
+    },
+    {
+      "parameters": {
+        "command": "cd /home/user/scripts && python3 setup_postgresql.py importar --input leads_verificados.json --nicho salud_mental --expo \"={{ $now.format('yyyy-MM') }}\" 2>&1"
+      },
+      "id": "script3-importar",
+      "name": "📜 Script 3 — Importar a PostgreSQL",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1500, 320],
+      "notesInFlow": true,
+      "notes": "Upsert de leads verificados en BD.\nExpo ID = mes actual (ej. 2026-02)"
+    },
+    {
+      "parameters": {
+        "command": "cd /home/user/scripts && python3 setup_postgresql.py exportar --output /home/user/exports/leads_crm_={{ $now.format('yyyyMMdd_HHmm') }}.csv 2>&1"
+      },
+      "id": "script3-exportar",
+      "name": "📜 Script 3 — Exportar CSV",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1740, 320],
+      "notesInFlow": true,
+      "notes": "Genera CSV con leads WhatsApp válidos.\nGuardado en /home/user/exports/"
+    },
+    {
+      "parameters": {
+        "command": "cd /home/user/scripts && python3 setup_postgresql.py stats 2>&1"
+      },
+      "id": "script3-stats",
+      "name": "📊 Script 3 — Stats de BD",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1980, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsear el output de stats y construir resumen para notificación\nconst stdout = $input.first().json.stdout || '';\n\n// Extraer métricas con regex\nconst totalMatch    = stdout.match(/Total leads\\s+:\\s*(\\d+)/);\nconst validosMatch  = stdout.match(/WhatsApp válidos\\s+:\\s*(\\d+)\\s+\\((\\d+)%\\)/);\nconst emailMatch    = stdout.match(/Con email\\s+:\\s*(\\d+)/);\n\nconst total   = totalMatch   ? parseInt(totalMatch[1])   : 0;\nconst validos = validosMatch ? parseInt(validosMatch[1]) : 0;\nconst pct     = validosMatch ? parseInt(validosMatch[2]) : 0;\nconst emails  = emailMatch   ? parseInt(emailMatch[1])   : 0;\n\n// Buscar archivo CSV generado\nconst csvPattern = stdout.match(/leads_crm_[\\d_]+\\.csv/);\nconst csvFile    = csvPattern ? csvPattern[0] : 'leads_crm.csv';\nconst csvPath    = `/home/user/exports/${csvFile}`;\n\nreturn [{\n  json: {\n    total,\n    validos,\n    pct_whatsapp: pct,\n    con_email: emails,\n    csv_path: csvPath,\n    csv_nombre: csvFile,\n    fecha: new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' }),\n    resumen_texto: [\n      `📊 *Reporte Leads B2B — Salud Mental CDMX*`,\n      `📅 ${new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })}`,\n      ``,\n      `📋 Total en BD       : ${total}`,\n      `✅ WhatsApp válidos  : ${validos} (${pct}%)`,\n      `📧 Con email         : ${emails}`,\n      ``,\n      `📁 CSV listo         : ${csvFile}`,\n      ``,\n      `➡️ Importa el CSV a tu CRM para iniciar outreach.`,\n    ].join('\\n'),\n  }\n}];\n"
+      },
+      "id": "parse-stats",
+      "name": "🔢 Parsear Stats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2220, 320]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.resumen_texto }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-telegram",
+      "name": "📱 Notificar por Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2460, 240],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Opcional: configura tu bot de Telegram.\nO reemplaza este nodo por Email/Slack."
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.SMTP_FROM }}",
+        "toEmail":   "={{ $env.NOTIFY_EMAIL }}",
+        "subject":   "✅ Leads B2B listos — {{ $json.validos }} con WhatsApp válido",
+        "emailType": "text",
+        "message":   "={{ $json.resumen_texto }}"
+      },
+      "id": "notify-email",
+      "name": "📧 Notificar por Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [2460, 400],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-cred",
+          "name": "SMTP"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Alternativa a Telegram.\nConfigura credenciales SMTP en n8n."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nodo de manejo de error — Script 1 falló\nconst stdout   = $input.first().json.stdout   || '';\nconst stderr   = $input.first().json.stderr   || '';\nconst exitCode = $input.first().json.exitCode;\n\nconsole.error(`[ERROR] Script 1 falló con código ${exitCode}`);\nconsole.error('STDOUT:', stdout);\nconsole.error('STDERR:', stderr);\n\nreturn [{\n  json: {\n    error:     true,\n    script:    'extractor_leads.py',\n    exitCode,\n    mensaje:   `Script 1 (Extractor) falló con código ${exitCode}`,\n    stdout:    stdout.slice(-500),\n    stderr:    stderr.slice(-500),\n    timestamp: new Date().toISOString(),\n  }\n}];\n"
+      },
+      "id": "error-script1",
+      "name": "🔴 Error Script 1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nodo de manejo de error — Script 2 falló\nconst stdout   = $input.first().json.stdout   || '';\nconst stderr   = $input.first().json.stderr   || '';\nconst exitCode = $input.first().json.exitCode;\n\nconsole.error(`[ERROR] Script 2 falló con código ${exitCode}`);\n\nreturn [{\n  json: {\n    error:     true,\n    script:    'verificar_whatsapp.py',\n    exitCode,\n    mensaje:   `Script 2 (Verificador) falló con código ${exitCode}`,\n    stdout:    stdout.slice(-500),\n    stderr:    stderr.slice(-500),\n    timestamp: new Date().toISOString(),\n  }\n}];\n"
+      },
+      "id": "error-script2",
+      "name": "🔴 Error Script 2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1500, 520]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "🔴 *Error en pipeline de Leads B2B*\n\n*Script:* `={{ $json.script }}`\n*Código:* `={{ $json.exitCode }}`\n*Mensaje:* {{ $json.mensaje }}\n\n*Log:*\n```\n={{ $json.stdout }}\n```",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-error",
+      "name": "🚨 Notificar Error",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1740, 560],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-cred",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, mensaje: 'Pipeline iniciado', timestamp: new Date().toISOString() }) }}"
+      },
+      "id": "webhook-trigger",
+      "name": "🌐 Webhook Trigger (n8n → externo)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 720],
+      "webhookId": "leads-b2b-trigger",
+      "notesInFlow": true,
+      "notes": "URL: https://tu-n8n.com/webhook/leads-b2b-trigger\nÚsala desde Postman, cron externo o tu app."
+    }
+  ],
+  "connections": {
+    "▶️ Inicio Manual": {
+      "main": [[{ "node": "📜 Script 1 — Extractor de Leads", "type": "main", "index": 0 }]]
+    },
+    "⏰ Schedule Semanal (Lunes 6am)": {
+      "main": [[{ "node": "📜 Script 1 — Extractor de Leads", "type": "main", "index": 0 }]]
+    },
+    "🌐 Webhook Trigger (n8n → externo)": {
+      "main": [[{ "node": "📜 Script 1 — Extractor de Leads", "type": "main", "index": 0 }]]
+    },
+    "📜 Script 1 — Extractor de Leads": {
+      "main": [[{ "node": "✅ ¿Script 1 OK?", "type": "main", "index": 0 }]]
+    },
+    "✅ ¿Script 1 OK?": {
+      "main": [
+        [{ "node": "📜 Script 2 — Verificador WhatsApp", "type": "main", "index": 0 }],
+        [{ "node": "🔴 Error Script 1",                  "type": "main", "index": 0 }]
+      ]
+    },
+    "📜 Script 2 — Verificador WhatsApp": {
+      "main": [[{ "node": "✅ ¿Script 2 OK?", "type": "main", "index": 0 }]]
+    },
+    "✅ ¿Script 2 OK?": {
+      "main": [
+        [{ "node": "📜 Script 3 — Importar a PostgreSQL", "type": "main", "index": 0 }],
+        [{ "node": "🔴 Error Script 2",                   "type": "main", "index": 0 }]
+      ]
+    },
+    "📜 Script 3 — Importar a PostgreSQL": {
+      "main": [[{ "node": "📜 Script 3 — Exportar CSV", "type": "main", "index": 0 }]]
+    },
+    "📜 Script 3 — Exportar CSV": {
+      "main": [[{ "node": "📜 Script 3 — Stats de BD", "type": "main", "index": 0 }]]
+    },
+    "📜 Script 3 — Stats de BD": {
+      "main": [[{ "node": "🔢 Parsear Stats", "type": "main", "index": 0 }]]
+    },
+    "🔢 Parsear Stats": {
+      "main": [
+        [{ "node": "📱 Notificar por Telegram", "type": "main", "index": 0 }],
+        [{ "node": "📧 Notificar por Email",    "type": "main", "index": 0 }]
+      ]
+    },
+    "🔴 Error Script 1": {
+      "main": [[{ "node": "🚨 Notificar Error", "type": "main", "index": 0 }]]
+    },
+    "🔴 Error Script 2": {
+      "main": [[{ "node": "🚨 Notificar Error", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "leads-b2b" },
+    { "name": "salud-mental" },
+    { "name": "cdmx" }
+  ],
+  "pinData": {},
+  "versionId": "1.0.0",
+  "meta": {
+    "instanceId": "leads-b2b-salud-mental-cdmx"
+  }
+}
