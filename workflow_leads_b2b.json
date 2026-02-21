@@ -1,5 +1,5 @@
 {
-  "name": "Leads B2B — Salud Mental CDMX",
+  "name": "Leads B2B — Salud Mental CDMX (Multi-OS)",
   "nodes": [
     {
       "parameters": {},
@@ -31,7 +31,7 @@
     },
     {
       "parameters": {
-        "command": "cd /home/user/scripts && python3 extractor_leads.py --keyword \"psicólogo CDMX\" --location \"Ciudad de México\" --max 200 --output leads_raw.json 2>&1"
+        "command": "python {{ $env.SCRIPTS_DIR }}/extractor_hibrido.py --max 200 --output leads_raw.json 2>&1"
       },
       "id": "script1-extractor",
       "name": "📜 Script 1 — Extractor de Leads",
@@ -39,7 +39,7 @@
       "typeVersion": 1,
       "position": [520, 480],
       "notesInFlow": true,
-      "notes": "Extrae leads desde Apollo + Google Maps.\nGenera: leads_raw.json"
+      "notes": "Extrae leads desde Doctoralia.\nGenera: leads_raw.json\nRequiere variable SCRIPTS_DIR."
     },
     {
       "parameters": {
@@ -72,7 +72,7 @@
     },
     {
       "parameters": {
-        "command": "cd /home/user/scripts && python3 verificar_whatsapp.py --input leads_raw.json --output leads_verificados.json --max-hora 40 2>&1"
+        "command": "python {{ $env.SCRIPTS_DIR }}/verificar_whatsapp.py --input leads_raw.json --output leads_verificados.json --max-hora 40 2>&1"
       },
       "id": "script2-verificador",
       "name": "📜 Script 2 — Verificador WhatsApp",
@@ -113,7 +113,7 @@
     },
     {
       "parameters": {
-        "command": "cd /home/user/scripts && python3 setup_postgresql.py importar --input leads_verificados.json --nicho salud_mental --expo \"={{ $now.format('yyyy-MM') }}\" 2>&1"
+        "command": "python {{ $env.SCRIPTS_DIR }}/setup_postgresql.py importar --input leads_verificados.json --nicho salud_mental --expo \"={{ $now.format('yyyy-MM') }}\" 2>&1"
       },
       "id": "script3-importar",
       "name": "📜 Script 3 — Importar a PostgreSQL",
@@ -125,7 +125,7 @@
     },
     {
       "parameters": {
-        "command": "cd /home/user/scripts && python3 setup_postgresql.py exportar --output /home/user/exports/leads_crm_={{ $now.format('yyyyMMdd_HHmm') }}.csv 2>&1"
+        "command": "python {{ $env.SCRIPTS_DIR }}/setup_postgresql.py exportar --output {{ $env.EXPORTS_DIR }}/leads_crm.csv 2>&1"
       },
       "id": "script3-exportar",
       "name": "📜 Script 3 — Exportar CSV",
@@ -133,11 +133,11 @@
       "typeVersion": 1,
       "position": [1740, 320],
       "notesInFlow": true,
-      "notes": "Genera CSV con leads WhatsApp válidos.\nGuardado en /home/user/exports/"
+      "notes": "Genera CSV con leads WhatsApp válidos.\nGuardado en {{ $env.EXPORTS_DIR }}/leads_crm.csv"
     },
     {
       "parameters": {
-        "command": "cd /home/user/scripts && python3 setup_postgresql.py stats 2>&1"
+        "command": "python {{ $env.SCRIPTS_DIR }}/setup_postgresql.py stats 2>&1"
       },
       "id": "script3-stats",
       "name": "📊 Script 3 — Stats de BD",
@@ -147,7 +147,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parsear el output de stats y construir resumen para notificación\nconst stdout = $input.first().json.stdout || '';\n\n// Extraer métricas con regex\nconst totalMatch    = stdout.match(/Total leads\\s+:\\s*(\\d+)/);\nconst validosMatch  = stdout.match(/WhatsApp válidos\\s+:\\s*(\\d+)\\s+\\((\\d+)%\\)/);\nconst emailMatch    = stdout.match(/Con email\\s+:\\s*(\\d+)/);\n\nconst total   = totalMatch   ? parseInt(totalMatch[1])   : 0;\nconst validos = validosMatch ? parseInt(validosMatch[1]) : 0;\nconst pct     = validosMatch ? parseInt(validosMatch[2]) : 0;\nconst emails  = emailMatch   ? parseInt(emailMatch[1])   : 0;\n\n// Buscar archivo CSV generado\nconst csvPattern = stdout.match(/leads_crm_[\\d_]+\\.csv/);\nconst csvFile    = csvPattern ? csvPattern[0] : 'leads_crm.csv';\nconst csvPath    = `/home/user/exports/${csvFile}`;\n\nreturn [{\n  json: {\n    total,\n    validos,\n    pct_whatsapp: pct,\n    con_email: emails,\n    csv_path: csvPath,\n    csv_nombre: csvFile,\n    fecha: new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' }),\n    resumen_texto: [\n      `📊 *Reporte Leads B2B — Salud Mental CDMX*`,\n      `📅 ${new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })}`,\n      ``,\n      `📋 Total en BD       : ${total}`,\n      `✅ WhatsApp válidos  : ${validos} (${pct}%)`,\n      `📧 Con email         : ${emails}`,\n      ``,\n      `📁 CSV listo         : ${csvFile}`,\n      ``,\n      `➡️ Importa el CSV a tu CRM para iniciar outreach.`,\n    ].join('\\n'),\n  }\n}];\n"
+        "jsCode": "// Parsear el output de stats y construir resumen para notificación\nconst stdout = $input.first().json.stdout || '';\n\n// Extraer métricas con regex\nconst totalMatch    = stdout.match(/Total leads\\s+:\\s*(\\d+)/);\nconst validosMatch  = stdout.match(/WhatsApp válidos\\s+:\\s*(\\d+)\\s+\\((\\d+)%\\)/);\nconst emailMatch    = stdout.match(/Con email\\s+:\\s*(\\d+)/);\n\nconst total   = totalMatch   ? parseInt(totalMatch[1])   : 0;\nconst validos = validosMatch ? parseInt(validosMatch[1]) : 0;\nconst pct     = validosMatch ? parseInt(validosMatch[2]) : 0;\nconst emails  = emailMatch   ? parseInt(emailMatch[1])   : 0;\n\n// Ruta fija del CSV generado\nconst csvFile    = 'leads_crm.csv';\nconst csvPath    = `{{ $env.EXPORTS_DIR }}/${csvFile}`;\n\nreturn [{\n  json: {\n    total,\n    validos,\n    pct_whatsapp: pct,\n    con_email: emails,\n    csv_path: csvPath,\n    csv_nombre: csvFile,\n    fecha: new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' }),\n    resumen_texto: [\n      `📊 *Reporte Leads B2B — Salud Mental CDMX*`,\n      `📅 ${new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })}`,\n      ``,\n      `📋 Total en BD       : ${total}`,\n      `✅ WhatsApp válidos  : ${validos} (${pct}%)`,\n      `📧 Con email         : ${emails}`,\n      ``,\n      `📁 CSV listo         : ${csvFile}`,\n      ``,\n      `➡️ Importa el CSV a tu CRM para iniciar outreach.`,\n    ].join('\\n'),\n  }\n}];\n"
       },
       "id": "parse-stats",
       "name": "🔢 Parsear Stats",
@@ -201,7 +201,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Nodo de manejo de error — Script 1 falló\nconst stdout   = $input.first().json.stdout   || '';\nconst stderr   = $input.first().json.stderr   || '';\nconst exitCode = $input.first().json.exitCode;\n\nconsole.error(`[ERROR] Script 1 falló con código ${exitCode}`);\nconsole.error('STDOUT:', stdout);\nconsole.error('STDERR:', stderr);\n\nreturn [{\n  json: {\n    error:     true,\n    script:    'extractor_leads.py',\n    exitCode,\n    mensaje:   `Script 1 (Extractor) falló con código ${exitCode}`,\n    stdout:    stdout.slice(-500),\n    stderr:    stderr.slice(-500),\n    timestamp: new Date().toISOString(),\n  }\n}];\n"
+        "jsCode": "// Nodo de manejo de error — Script 1 falló\nconst stdout   = $input.first().json.stdout   || '';\nconst stderr   = $input.first().json.stderr   || '';\nconst exitCode = $input.first().json.exitCode;\n\nconsole.error(`[ERROR] Script 1 falló con código ${exitCode}`);\nconsole.error('STDOUT:', stdout);\nconsole.error('STDERR:', stderr);\n\nreturn [{\n  json: {\n    error:     true,\n    script:    'extractor_hibrido.py',\n    exitCode,\n    mensaje:   `Script 1 (Extractor) falló con código ${exitCode}`,\n    stdout:    stdout.slice(-500),\n    stderr:    stderr.slice(-500),\n    timestamp: new Date().toISOString(),\n  }\n}];\n"
       },
       "id": "error-script1",
       "name": "🔴 Error Script 1",
@@ -286,9 +286,9 @@
       "main": [[{ "node": "📜 Script 3 — Exportar CSV", "type": "main", "index": 0 }]]
     },
     "📜 Script 3 — Exportar CSV": {
-      "main": [[{ "node": "📜 Script 3 — Stats de BD", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "📊 Script 3 — Stats de BD", "type": "main", "index": 0 }]]
     },
-    "📜 Script 3 — Stats de BD": {
+    "📊 Script 3 — Stats de BD": {
       "main": [[{ "node": "🔢 Parsear Stats", "type": "main", "index": 0 }]]
     },
     "🔢 Parsear Stats": {
