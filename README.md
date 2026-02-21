@@ -1,4 +1,3 @@
-```markdown
 # LeadsB2B — Pipeline de Generación y Verificación de Leads para Salud Mental en CDMX
 
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-311/)
