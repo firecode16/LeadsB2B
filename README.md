@@ -233,7 +233,7 @@ Borra la carpeta `whatsapp_profile/` y ejecuta con `--debug`.
 
 ## 📄 Licencia
 
-MIT License — uso libre, bajo tu propia responsabilidad.
+MIT License — usalo bajo tu propia responsabilidad.
 
 ---
 
