@@ -528,8 +528,12 @@ def main():
     else:
         guardar_checkpoint(DEFAULT_CHECKPOINT, procesados)
 
-    imprimir_resumen(todos, args.output)
-
+    # Al final de main(), justo después de guardar_resultados(todos, args.output)
+    try:
+        imprimir_resumen(todos, args.output)
+    except Exception as e:
+        log.warning(f"⚠️ No se pudo imprimir el resumen (entorno no UTF-8): {e}")
+        # No relanzamos la excepción, para que el script termine con código 0
 
 # ════════════════════════════════════════════════════════════════════════════
 # 6. UTILIDADES

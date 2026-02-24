@@ -606,17 +606,23 @@ def cmd_exportar_json(input_path: str, output_path: str, solo_validos: bool, nic
 
     con_wa = sum(1 for l in filtrados if l.get("whatsapp_valido") is True)
 
-    print("\n" + "═" * 52)
-    print("  📤  RESUMEN DE EXPORTACIÓN (desde JSON)")
-    print("═" * 52)
-    print(f"  Leads en archivo JSON  : {len(leads)}")
-    print(f"  Leads después de filtros: {len(filtrados)}")
-    print(f"  Con WhatsApp válido    : {con_wa}")
-    print(f"  Archivo CSV            : {output_path}")
-    print(f"  Encoding               : UTF-8 BOM (compatible Excel)")
-    print("═" * 52)
-    print("  ✅  Listo para importar a CRM")
-    print("═" * 52 + "\n")
+    # Resumen que imprime (con manejo de errores de codificación)
+    try:
+        print("\n" + "═" * 52)
+        print("  📤  RESUMEN DE EXPORTACIÓN (desde JSON)")
+        print("═" * 52)
+        print(f"  Leads en archivo JSON  : {len(leads)}")
+        print(f"  Leads después de filtros: {len(filtrados)}")
+        print(f"  Con WhatsApp válido    : {con_wa}")
+        print(f"  Archivo CSV            : {output_path}")
+        print(f"  Encoding               : UTF-8 BOM (compatible Excel)")
+        print("═" * 52)
+        print("  ✅  Listo para importar a CRM")
+        print("═" * 52 + "\n")
+    except UnicodeEncodeError:
+        # Si falla la impresión por codificación, imprimimos una versión simple
+        log.info("Exportación completada. (No se pudo mostrar el resumen por problemas de codificación)")
+        log.info(f"CSV generado: {output_path}")
 
 
 # ════════════════════════════════════════════════════════════════════════════
